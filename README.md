@@ -10,6 +10,16 @@ The repository is built around a pragmatic workflow:
 4. Resolve noisy transcript fragments against slides or reference notes when there is evidence.
 5. Produce compact, review-oriented notes.
 
+## Preview
+
+E-guide style sample spread:
+
+![E-guide sample](examples/assets/eguide_xi_fazhi_sample.png)
+
+Exported PDF note sample:
+
+![PDF note sample](examples/assets/lesson_sample_page1.png)
+
 ## What this repo does
 
 - Downloads Canvas-hosted recordings when a local logged-in browser session is available.
@@ -29,6 +39,7 @@ The repository is built around a pragmatic workflow:
 - `fuzzy_lookup.py`: fuzzy lookup over slide PDFs and reference notes.
 - `clean_transcript.py`: remove obvious noise fragments from transcript text.
 - `export_notes_pdf.py`: export Markdown notes into per-note PDFs and one combined PDF.
+- `examples/`: sample note source and preview assets for the README.
 - `skills/lecture-notes-pipeline/`: Codex skill for running the workflow with stable note-writing rules.
 
 ## Requirements
@@ -89,6 +100,12 @@ This generates:
 
 - one PDF per Markdown note
 - one combined PDF volume by default
+
+Try the included sample:
+
+```bash
+python3 export_notes_pdf.py --notes-dir examples/sample_notes --output-dir examples/rendered
+```
 
 ## Canvas download configuration
 
