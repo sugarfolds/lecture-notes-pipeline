@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>E-Guide Sample — 习近平法治思想</title>
+  <style>
+    :root {
+      --bg: #ece7df;
+      --paper: #f8f4ee;
+      --ink: #181513;
+      --muted: #746a60;
+      --line: rgba(24, 21, 19, 0.14);
+      --accent: #9f3d2f;
+      --accent-soft: #e7c7b7;
+      --mono: "SF Mono", "Roboto Mono", ui-monospace, monospace;
+      --serif: "Iowan Old Style", "Baskerville", "Times New Roman", "Songti SC", "STSong", serif;
+      --sans: "Inter", "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+    body { font-family: var(--sans); }
+
+    @page {
+      size: 1600px 980px;
+      margin: 0;
+    }
+
+    .stage {
+      width: 1600px;
+      height: 980px;
+      margin: 0 auto;
+      padding: 54px 58px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 38px;
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.55), transparent 32%),
+        linear-gradient(180deg, #efe9e2 0%, #e8e1d7 100%);
+      overflow: hidden;
+    }
+
+    .page {
+      width: 600px;
+      height: 860px;
+      background: var(--paper);
+      border-radius: 10px;
+      box-shadow: 0 18px 38px rgba(28, 20, 14, 0.16);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cover { transform: rotate(-0.6deg); }
+    .spread { transform: rotate(0.6deg); }
+
+    .page::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(24, 21, 19, 0.08);
+      border-radius: 10px;
+      pointer-events: none;
+    }
+
+    .inner {
+      height: 100%;
+      padding: 42px 42px 30px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .eyebrow {
+      font: 11px/1.3 var(--mono);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 26px;
+    }
+
+    .display {
+      font-family: var(--serif);
+      font-size: 58px;
+      line-height: 0.96;
+      font-weight: 600;
+      letter-spacing: 0;
+      margin: 0;
+      max-width: 460px;
+    }
+
+    .display em,
+    .spread-title em {
+      font-style: italic;
+      font-weight: 400;
+      color: var(--accent);
+    }
+
+    .subtitle {
+      margin-top: 18px;
+      max-width: 420px;
+      color: #4e463f;
+      font-size: 18px;
+      line-height: 1.5;
+    }
+
+    .byline {
+      margin-top: 22px;
+      font: 12px/1.4 var(--mono);
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .stats {
+      margin-top: 34px;
+      padding: 14px 0 16px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font: 12px/1.5 var(--mono);
+      color: #413933;
+    }
+
+    .stats span::after {
+      content: "·";
+      margin-left: 10px;
+      color: rgba(24,21,19,0.35);
+    }
+
+    .stats span:last-child::after { content: ""; margin: 0; }
+
+    .toc-head {
+      margin-top: 34px;
+      font-family: var(--serif);
+      font-size: 26px;
+      line-height: 1.1;
+    }
+
+    .toc-grid {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px 24px;
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    .toc-item {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: end;
+      gap: 8px;
+    }
+
+    .toc-item .dots {
+      border-bottom: 1px dotted rgba(24, 21, 19, 0.18);
+      transform: translateY(-4px);
+    }
+
+    .toc-item .page-no {
+      font: 11px/1 var(--mono);
+      color: var(--muted);
+    }
+
+    .sticker {
+      position: absolute;
+      top: 42px;
+      right: 38px;
+      width: 88px;
+      height: 88px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 30%, #f1d2c5, #c56f59);
+      color: #fff7f2;
+      display: grid;
+      place-items: center;
+      font: 11px/1.35 var(--mono);
+      text-align: center;
+      letter-spacing: 0.12em;
+      box-shadow: 0 8px 18px rgba(159, 61, 47, 0.25);
+    }
+
+    .footer {
+      margin-top: auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+      font: 11px/1.3 var(--mono);
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .spread-title {
+      font-family: var(--serif);
+      font-size: 42px;
+      line-height: 1.02;
+      margin: 0 0 18px 0;
+      max-width: 420px;
+    }
+
+    .spread-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 26px;
+      align-items: start;
+      margin-top: 14px;
+    }
+
+    .body-copy {
+      font-size: 16px;
+      line-height: 1.8;
+      color: #2d2824;
+    }
+
+    .body-copy p {
+      margin: 0 0 16px 0;
+    }
+
+    .steps {
+      margin-top: 22px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(24, 21, 19, 0.1);
+    }
+
+    .step-no {
+      font: 12px/1.4 var(--mono);
+      color: var(--accent);
+      letter-spacing: 0.08em;
+    }
+
+    .step h4 {
+      margin: 0 0 3px 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .step p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #5f554c;
+    }
+
+    .quote-box {
+      padding: 18px 0 0 10px;
+      border-left: 2px solid rgba(159, 61, 47, 0.22);
+    }
+
+    .quote-box blockquote {
+      margin: 0;
+      font-family: var(--serif);
+      font-size: 31px;
+      line-height: 1.18;
+      color: var(--accent);
+      font-style: italic;
+    }
+
+    .quote-box .attr {
+      margin-top: 12px;
+      font: 11px/1.5 var(--mono);
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .mini-note {
+      margin-top: 22px;
+      padding: 14px 16px;
+      background: rgba(159, 61, 47, 0.06);
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.65;
+      color: #594c43;
+    }
+
+    .exercise {
+      margin-top: 22px;
+      padding: 16px 18px 18px;
+      background: #f1e8de;
+      border-radius: 14px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .exercise .label {
+      font: 11px/1.3 var(--mono);
+      letter-spacing: 0.16em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .exercise .prompt {
+      font-family: var(--serif);
+      font-size: 19px;
+      line-height: 1.45;
+      font-style: italic;
+      color: #302925;
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <section class="page cover" data-od-id="cover">
+      <div class="inner">
+        <div class="sticker">LAW<br>GUIDE</div>
+        <div class="eyebrow">XI JINPING THOUGHT ON THE RULE OF LAW · LECTURE 02</div>
+        <h1 class="display">法治如何长出<br><em>结构感</em></h1>
+        <div class="subtitle">
+          把“习近平法治思想”从口号层拆回制度结构、治理层级与裁判方法，
+          让这一讲真正变成可以复习、可以调用的知识地图。
+        </div>
+        <div class="byline">CURATED FROM COURSE NOTES · EURUS EDITION</div>
+
+        <div class="stats">
+          <span>03 组治理结构</span>
+          <span>05 个制度张力</span>
+          <span>02 个展开案例</span>
+        </div>
+
+        <div class="toc-head" data-od-id="toc">What's inside</div>
+        <div class="toc-grid">
+          <div class="toc-item"><span>法治政府</span><span class="dots"></span><span class="page-no">04</span></div>
+          <div class="toc-item"><span>科学立法</span><span class="dots"></span><span class="page-no">09</span></div>
+          <div class="toc-item"><span>条与条 / 条与块</span><span class="dots"></span><span class="page-no">12</span></div>
+          <div class="toc-item"><span>先买权冲突</span><span class="dots"></span><span class="page-no">16</span></div>
+          <div class="toc-item"><span>南通“第三机场”</span><span class="dots"></span><span class="page-no">18</span></div>
+          <div class="toc-item"><span>民主立法边界</span><span class="dots"></span><span class="page-no">22</span></div>
+        </div>
+
+        <div class="footer">
+          <span>Find the structure behind the slogan</span>
+          <span>01</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="page spread" data-od-id="spread">
+      <div class="inner">
+        <div class="eyebrow">CHAPTER 02 · 法治政府</div>
+        <h2 class="spread-title">规则要建立，<br>也要变得更<em>好</em>。</h2>
+
+        <div class="spread-grid">
+          <div class="body-copy">
+            <p>
+              这一讲真正往前推进的，不是“法治”三个字本身，而是法治如何从早期的秩序重建，
+              转向更高阶的制度质量判断。重点已经不再是“有没有规则”，而是规则是否融贯、
+              是否落地、是否值得被使用。
+            </p>
+            <p>
+              在行政法治层面，课堂把问题压缩成三组结构：条与条、条与块、块与块。
+              这意味着法治政府不只是一个抽象价值，而是部门权责、基层调权、区域协同这些
+              具体治理动作能否被重新配置。
+            </p>
+
+            <div class="steps">
+              <div class="step">
+                <div class="step-no">01</div>
+                <div>
+                  <h4>先看结构</h4>
+                  <p>不要先背口号，先把部门、属地、区域三个治理层次分开。</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-no">02</div>
+                <div>
+                  <h4>再看张力</h4>
+                  <p>把公权约束与私权保障、形式规则与制度目的、民主输入与制度筛选拆开。</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-no">03</div>
+                <div>
+                  <h4>抓案例</h4>
+                  <p>南通“上海第三机场”与先买权冲突，都在说明规则背后的资源重配逻辑。</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-no">04</div>
+                <div>
+                  <h4>落回裁判方法</h4>
+                  <p>当规则表面适用和制度目的冲突时，结论必须转入利益衡量。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="quote-box" data-od-id="pull-quote">
+              <blockquote>
+                “法治目标已从先把规则建起来，转向规则不仅要有，而且要好。”
+              </blockquote>
+              <div class="attr">KEY TAKEAWAY · 第02讲</div>
+            </div>
+
+            <div class="mini-note">
+              <strong>案例焦点：</strong> 南通“上海第三机场”不是地理命名问题，
+              而是区域规划如何越过属地边界，把航空、货运、总部经济重新分配到更大系统里。
+            </div>
+
+            <div class="exercise" data-od-id="exercise">
+              <div class="label">Exercise</div>
+              <div class="prompt">
+                用 “规则表面适用” 与 “制度目的审查” 两步法，重写一次整栋物业出售中的先买权冲突。
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>法治政府 · 结构、张力与重配</span>
+          <span>18</span>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

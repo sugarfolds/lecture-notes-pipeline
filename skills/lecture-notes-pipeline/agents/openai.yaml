@@ -1,0 +1,4 @@
+version: 1
+display_name: Lecture Notes Pipeline
+short_description: Turn lecture recordings into PPT-aligned study notes.
+default_prompt: Process recorded course sessions into compact PPT-aligned study notes with transcript cleanup and explicit case expansion.

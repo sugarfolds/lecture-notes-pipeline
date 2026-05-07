@@ -1,0 +1,27 @@
+.DS_Store
+.venv/
+__pycache__/
+*.pyc
+
+# Local outputs
+audio/
+downloads/
+notes/
+transcripts/
+pdf_preview/
+slides_index.md
+ppt_processing_queue.md
+uncertain_fragments.md
+lectures_manifest.json
+
+# Browser / scraped artifacts
+*.log
+index-*.js
+VideoList-*.js
+courseRecord-*.js
+ivs2-*.js
+useDownload-*.js
+canvas_bundle.js
+index.html
+live_page.html
+slide1.txt
