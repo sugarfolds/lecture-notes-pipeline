@@ -50,6 +50,7 @@ Python packages:
 - `mlx-whisper`
 - `reportlab`
 - `pypdf`
+- `python-pptx`
 
 System tools:
 
@@ -82,6 +83,13 @@ Batch download and transcribe:
 
 ```bash
 python3 run_course_pipeline.py --start 1 --end 6 --step all
+```
+
+Recommended for large courses:
+
+```bash
+python3 download_canvas_videos.py 1 2 --download --resume --output-dir /path/to/course-root/downloads
+python3 process_lecture.py /path/to/course-root/downloads/*.mp4 --audio-dir /path/to/course-root/audio --transcript-dir /path/to/course-root/transcripts
 ```
 
 Fuzzy lookup for noisy fragments:
@@ -125,6 +133,66 @@ python3 download_canvas_videos.py 4 5 6 --session-storage "/path/to/Session Stor
 ```
 
 This script is intentionally local-first. It is designed for workflows where the user is already logged into Canvas in Chrome on the same machine.
+
+For resumable course runs, use the downloader as a small stateful job rather than a long detached process:
+
+```bash
+python3 download_canvas_videos.py 4 5 6 --sync-details --output-dir /path/to/course-root/downloads
+python3 download_canvas_videos.py 4 5 6 --download --resume --max-count 2 --output-dir /path/to/course-root/downloads
+python3 download_canvas_videos.py --verify-only --output-dir /path/to/course-root/downloads
+python3 download_canvas_videos.py --status --output-dir /path/to/course-root/downloads
+```
+
+The downloader writes:
+
+- `canvas_download_manifest.json`: selected recordings, streams, output paths, and source URLs
+- `download_status.json`: per-lecture `pending / downloading / verified / failed` state
+- `download_runs/*.jsonl`: run logs for download and verification events
+
+If Canvas exposes multiple recording views and you know the desired `cdviViewNum`, pass `--view-num`. Otherwise the downloader keeps the previous behavior and chooses the smallest downloadable stream.
+
+## Download process hygiene
+
+Do not leave large download jobs hanging in the background.
+
+- Prefer small batches such as `1 2` or `1 2 3`, not the whole semester in one detached process.
+- Prefer `--max-count` when automation is driving the work.
+- After each batch, verify the expected files landed completely before starting transcription.
+- Use `--verify-only` and `--status` before deciding whether more download work is needed.
+- If a download job finishes or stalls, clean up the matching `python3 download_canvas_videos.py` and child `curl` processes promptly.
+- If you want an explicit cleanup pass, use:
+
+```bash
+python3 cleanup_download_jobs.py --list
+python3 cleanup_download_jobs.py --kill
+```
+
+The cleanup helper only targets downloader jobs from this repo. It does not kill unrelated Python or curl processes.
+
+## Download source stability
+
+For unattended project work, do not make the pipeline depend on an open browser tab.
+
+- Prefer a stable local `downloads/` directory first.
+- A symlinked `downloads/` directory is acceptable if the real files live elsewhere.
+- If the next lecture video is missing locally, record that as a project gap instead of assuming Canvas is still open in the current thread.
+- Treat browser session state as opportunistic input, not as the primary long-term source of truth.
+
+## Transcription process hygiene
+
+The same cleanup rule applies to transcription jobs.
+
+- Run one lecture or one small batch at a time.
+- After each transcription finishes, verify the expected `.txt` and `.json` files landed.
+- Explicitly check for residual `process_lecture.py` processes instead of assuming they exited cleanly.
+- If a transcription process is stalled or no longer needed, terminate it before starting new heavy work.
+
+Use:
+
+```bash
+python3 cleanup_course_jobs.py --list
+python3 cleanup_course_jobs.py --kill
+```
 
 ## Output conventions
 

@@ -33,7 +33,7 @@ def run(cmd: list[str]) -> None:
 
 def download_lectures(start: int, end: int) -> None:
     wanted = list(range(start, end + 1))
-    args = ["python3", str(DOWNLOAD_SCRIPT), *[str(item) for item in wanted]]
+    args = ["python3", str(DOWNLOAD_SCRIPT), *[str(item) for item in wanted], "--download", "--resume"]
     run(args)
 
 

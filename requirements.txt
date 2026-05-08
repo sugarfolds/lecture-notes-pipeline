@@ -2,3 +2,4 @@ requests
 mlx-whisper
 reportlab
 pypdf
+python-pptx
