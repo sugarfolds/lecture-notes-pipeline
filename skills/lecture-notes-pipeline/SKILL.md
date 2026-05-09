@@ -50,7 +50,7 @@ Use this skill for course-recording workflows where the output is not just a tra
 11. If the local project does not contain the next required video, record that as a concrete project status gap instead of pretending the web source is still available.
 12. If slides are missing for a transcript range, create a gap list and preparatory checklist; do not force a formal lecture note before the slide boundary is stable.
 13. If slides exist and have been checked but no stable transcript or recording segment matches them, create a slide-only materials note instead of leaving the material unusable:
-   - name it clearly, such as `*_slide_materials_note.md` or the local equivalent
+   - follow the local course naming convention, such as `第XX讲_主题_课件材料笔记.md` in Chinese course repos, or the closest local equivalent
    - mark at the top that it is based on slides only and has no stable transcript-backed lecture expansion yet
    - do not label it as a formal integrated lecture note
    - upgrade it later if a matching transcript or recording is found
