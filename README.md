@@ -1,5 +1,7 @@
 # lecture-notes-pipeline
 
+> Recorded classes turned into PPT-aligned, review-ready study notes.
+
 Pipeline for turning recorded course sessions into PPT-aligned study notes.
 
 The repository is built around a pragmatic workflow:
