@@ -12,11 +12,7 @@ The repository is built around a pragmatic workflow:
 
 ## Preview
 
-E-guide style sample spread:
-
-![E-guide sample](examples/assets/eguide_xi_fazhi_sample.png)
-
-Exported PDF note sample:
+Exported lecture note sample:
 
 ![PDF note sample](examples/assets/lesson_sample_page1.png)
 
