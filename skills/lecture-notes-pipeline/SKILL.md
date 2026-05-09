@@ -49,6 +49,11 @@ Use this skill for course-recording workflows where the output is not just a tra
    - do not leave heavy background download or transcription jobs running unattended on the user's machine
 11. If the local project does not contain the next required video, record that as a concrete project status gap instead of pretending the web source is still available.
 12. If slides are missing for a transcript range, create a gap list and preparatory checklist; do not force a formal lecture note before the slide boundary is stable.
+13. If slides exist and have been checked but no stable transcript or recording segment matches them, create a slide-only materials note instead of leaving the material unusable:
+   - name it clearly, such as `*_slide_materials_note.md` or the local equivalent
+   - mark at the top that it is based on slides only and has no stable transcript-backed lecture expansion yet
+   - do not label it as a formal integrated lecture note
+   - upgrade it later if a matching transcript or recording is found
 
 ## Download state
 
@@ -79,6 +84,7 @@ Before using a transcript in formal notes:
 - Headings should land directly on concepts, structures, rules, tests, or judgments; avoid meta headings like “课堂补充”, “方法意义”, or “本讲定位” in the main body.
 - Merge slide structure and transcript content into a single note; do not produce a “slide outline plus later supplements” shape.
 - Keep boundary/process notes minimal inside formal notes; move most cut-point, noise, and transcript-repair detail into queue/status/uncertainty files when the workspace has them.
+- For slide-only materials notes, keep the same compact study-note style but preserve provenance: the note must say it is slide-derived only, and it must not imply the instructor actually covered the material in class.
 - Expand any case that is materially discussed in class.
 - Prefer `Markdown` as the editable source of truth and `PDF` as the final reading/export format.
 

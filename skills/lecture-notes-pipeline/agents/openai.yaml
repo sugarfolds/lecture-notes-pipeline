@@ -1,4 +1,4 @@
 version: 1
 display_name: Lecture Notes Pipeline
-short_description: Turn lecture recordings into PPT-aligned study notes.
-default_prompt: Process recorded course sessions into compact PPT-aligned study notes with transcript cleanup and explicit case expansion.
+short_description: Turn lecture recordings or unmatched slides into study notes.
+default_prompt: Process recorded course sessions into compact PPT-aligned study notes with transcript cleanup, explicit case expansion, and slide-only materials notes when slides do not match a stable transcript segment.
