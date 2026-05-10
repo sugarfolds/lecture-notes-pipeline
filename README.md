@@ -197,6 +197,8 @@ python3 download_canvas_videos.py \
 
 `--canvas-cookie-file` accepts Netscape cookie exports and simple `name=value; name2=value2` cookie header text. You can also pass the header directly with `--canvas-cookie`. This mode does not store account passwords or perform jAccount login; refresh the cookie from your own browser session when it expires.
 
+SJTU note: `findVodVideoList` expects a JSON request body, and the `canvasCourseId` value should be `encodeURIComponent(courId)`. If you pass the raw `courId`, the platform may return an empty list or a decrypt failure even when the current browser page can play the recording.
+
 This script is intentionally local-first. It is designed for workflows where the user is already logged into Canvas in Chrome on the same machine.
 
 For resumable course runs, use the downloader as a small stateful job rather than a long detached process:
