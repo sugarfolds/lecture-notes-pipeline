@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import argparse
+import base64
+from html.parser import HTMLParser
 import json
 import os
 import re
@@ -11,11 +13,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
+from urllib.parse import parse_qsl, quote, urlparse
 
 import requests
 
 
 BASE_URL = os.environ.get("CANVAS_BASE_URL", "https://v.sjtu.edu.cn/jy-application-canvas-sjtu")
+OC_BASE_URL = os.environ.get("SJTU_OC_BASE_URL", "https://oc.sjtu.edu.cn")
 SESSION_STORAGE = Path(
     os.environ.get(
         "CANVAS_SESSION_STORAGE",
@@ -44,6 +48,57 @@ class StreamChoice:
     raw: dict[str, Any]
 
 
+class FormParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.forms: list[dict[str, Any]] = []
+        self._current_form: dict[str, Any] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attrs_dict = {key: value or "" for key, value in attrs}
+        if tag == "form":
+            self._current_form = {
+                "action": attrs_dict.get("action", ""),
+                "method": attrs_dict.get("method", "post").lower(),
+                "inputs": {},
+            }
+            return
+        if tag == "input" and self._current_form is not None:
+            name = attrs_dict.get("name")
+            if name:
+                self._current_form["inputs"][name] = attrs_dict.get("value", "")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "form" and self._current_form is not None:
+            self.forms.append(self._current_form)
+            self._current_form = None
+
+
+class CourseVideoLinkParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.links: list[tuple[str, str]] = []
+        self._href: str | None = None
+        self._text_parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "a":
+            return
+        attrs_dict = {key: value or "" for key, value in attrs}
+        self._href = attrs_dict.get("href")
+        self._text_parts = []
+
+    def handle_data(self, data: str) -> None:
+        if self._href is not None:
+            self._text_parts.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "a" and self._href is not None:
+            self.links.append((self._href, "".join(self._text_parts).strip()))
+            self._href = None
+            self._text_parts = []
+
+
 def now_iso() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
@@ -67,6 +122,135 @@ def append_run_log(runs_dir: Path, event: str, payload: dict[str, Any]) -> None:
     row = {"time": now_iso(), "event": event, **payload}
     with log_path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def decode_jwt_payload(token: str | None) -> dict[str, Any]:
+    if not token or token.count(".") < 2:
+        return {}
+    payload = token.split(".")[1]
+    payload += "=" * (-len(payload) % 4)
+    try:
+        decoded = base64.urlsafe_b64decode(payload)
+        data = json.loads(decoded)
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def parse_redirect_params(url: str | None) -> dict[str, str]:
+    if not url:
+        return {}
+    parsed = urlparse(url)
+    params = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    if "?" in parsed.fragment:
+        _, _, fragment_query = parsed.fragment.partition("?")
+        params.update(parse_qsl(fragment_query, keep_blank_values=True))
+    return params
+
+
+def nested_value(obj: Any, *path: str) -> Any:
+    current = obj
+    for key in path:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(key)
+    return current
+
+
+def extract_video_records(payload: Any) -> list[dict[str, Any]]:
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
+    for path in (
+        ("data", "records"),
+        ("data", "list"),
+        ("data", "rows"),
+        ("data", "items"),
+        ("data", "page", "records"),
+        ("data", "page", "list"),
+        ("body", "list"),
+        ("body",),
+        ("data",),
+    ):
+        value = nested_value(payload, *path)
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+    raise RuntimeError(f"视频列表接口未返回可识别的数据: {payload}")
+
+
+def extract_video_detail(payload: Any) -> dict[str, Any]:
+    if isinstance(payload, dict):
+        for path in (("data",), ("body",)):
+            value = nested_value(payload, *path)
+            if isinstance(value, dict):
+                return value
+    raise RuntimeError(f"视频详情接口未返回可识别的数据: {payload}")
+
+
+def find_form(html: str, action_contains: str) -> dict[str, Any]:
+    parser = FormParser()
+    parser.feed(html)
+    for form in parser.forms:
+        if action_contains in str(form.get("action") or ""):
+            return form
+    raise RuntimeError(f"未找到 action 包含 {action_contains!r} 的表单")
+
+
+def absolute_url(url: str, default_base: str) -> str:
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+    if url.startswith("/"):
+        parsed = urlparse(default_base)
+        return f"{parsed.scheme}://{parsed.netloc}{url}"
+    return default_base.rstrip("/") + "/" + url
+
+
+def load_cookie_file(path: Path) -> dict[str, str]:
+    cookies: dict[str, str] = {}
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "\t" in line:
+            parts = line.split("\t")
+            if len(parts) >= 7:
+                cookies[parts[5]] = parts[6]
+            continue
+        for part in line.split(";"):
+            if "=" not in part:
+                continue
+            name, value = part.strip().split("=", 1)
+            if name:
+                cookies[name] = value
+    if not cookies:
+        raise RuntimeError(f"未能从 cookie 文件读取任何 cookie: {path}")
+    return cookies
+
+
+def parse_cookie_header(value: str) -> dict[str, str]:
+    cookies: dict[str, str] = {}
+    for part in value.split(";"):
+        if "=" not in part:
+            continue
+        name, cookie_value = part.strip().split("=", 1)
+        if name:
+            cookies[name] = cookie_value
+    if not cookies:
+        raise RuntimeError("--canvas-cookie 没有包含可识别的 name=value")
+    return cookies
+
+
+def update_session_cookies(
+    session: requests.Session,
+    *,
+    cookie_file: Path | None = None,
+    cookie_header: str | None = None,
+) -> None:
+    if cookie_file is None and not cookie_header:
+        raise RuntimeError("sjtu-lti source 需要 --canvas-cookie-file 或 --canvas-cookie")
+    if cookie_file is not None:
+        session.cookies.update(load_cookie_file(cookie_file.expanduser()))
+    if cookie_header:
+        session.cookies.update(parse_cookie_header(cookie_header))
 
 
 def utf16_field(text: str, field: str) -> str | None:
@@ -119,6 +303,105 @@ def load_session_state(path: Path = SESSION_STORAGE) -> SessionState:
     )
 
 
+def get_sjtu_external_tool_id(session: requests.Session, course_id: str) -> str:
+    response = session.get(f"{OC_BASE_URL}/courses/{course_id}", timeout=30)
+    response.raise_for_status()
+    if "login" in urlparse(response.url).path.lower():
+        raise RuntimeError("Canvas cookie 未通过登录校验，请刷新登录态后重试")
+
+    parser = CourseVideoLinkParser()
+    parser.feed(response.text)
+    for href, text in parser.links:
+        if "课堂视频" in text and "旧版" not in text and "/external_tools/" in href:
+            return href.rstrip("/").rpartition("/")[-1]
+    return "8329"
+
+
+def sjtu_canvas_course_id(params: dict[str, str], *payload_sources: dict[str, str]) -> str | None:
+    for key in ("courId", "canvasCourseId", "courseId", "ltiCourseId"):
+        value = params.get(key)
+        if value:
+            return str(value)
+
+    for source in payload_sources:
+        for key in ("lti_message_hint", "id_token", "state"):
+            payload = decode_jwt_payload(source.get(key))
+            for fallback_key in ("courId", "canvasCourseId", "courseId", "ltiCourseId"):
+                value = payload.get(fallback_key)
+                if value:
+                    return str(value)
+            context_id = payload.get("context_id")
+            if context_id:
+                return str(context_id)
+            context = payload.get("https://purl.imsglobal.org/spec/lti/claim/context")
+            if isinstance(context, dict) and context.get("id"):
+                return str(context["id"])
+    return None
+
+
+def load_sjtu_lti_state(
+    session: requests.Session,
+    *,
+    course_id: str,
+    external_tool_id: str | None = None,
+) -> SessionState:
+    tool_id = external_tool_id or get_sjtu_external_tool_id(session, course_id)
+    tool_url = f"{OC_BASE_URL}/courses/{course_id}/external_tools/{tool_id}"
+    launch_response = session.get(tool_url, timeout=30)
+    launch_response.raise_for_status()
+
+    login_form = find_form(launch_response.text, "/oidc/login_initiations")
+    login_response = session.post(
+        absolute_url(str(login_form["action"]), BASE_URL),
+        data=login_form["inputs"],
+        allow_redirects=True,
+        timeout=30,
+    )
+    login_response.raise_for_status()
+
+    auth_form = find_form(login_response.text, "/lti3/lti3Auth/ivs")
+    auth_response = session.post(
+        absolute_url(str(auth_form["action"]), BASE_URL),
+        data=auth_form["inputs"],
+        allow_redirects=False,
+        timeout=30,
+    )
+    auth_response.raise_for_status()
+
+    redirect_url = auth_response.headers.get("location")
+    redirect_params = parse_redirect_params(redirect_url)
+    token_id = redirect_params.get("tokenId")
+    if not token_id:
+        raise RuntimeError(f"未能从 LTI 跳转中解析 tokenId: {sorted(redirect_params)}")
+
+    token_response = session.get(
+        f"{BASE_URL}/lti3/getAccessTokenByTokenId",
+        params={"tokenId": token_id},
+        timeout=30,
+    )
+    token_response.raise_for_status()
+    token_payload = token_response.json()
+    if str(token_payload.get("code")) != "0":
+        raise RuntimeError(f"getAccessTokenByTokenId 返回失败: {token_payload}")
+
+    data = token_payload.get("data") or {}
+    params = data.get("params") or {}
+    token = data.get("token")
+    if not token:
+        raise RuntimeError(f"getAccessTokenByTokenId 未返回 token: {token_payload}")
+    cour_id = (
+        params.get("courId")
+        or params.get("canvasCourseId")
+        or params.get("courseId")
+        or params.get("ltiCourseId")
+        or sjtu_canvas_course_id(redirect_params, login_form["inputs"], auth_form["inputs"])
+    )
+    if not cour_id:
+        raise RuntimeError(f"未能解析视频平台课程 ID: {token_payload}")
+
+    return SessionState(token=str(token), cour_id=str(cour_id), lti_course_id=str(cour_id), client_id="sjtu-lti")
+
+
 def api_post(
     session: requests.Session,
     path: str,
@@ -141,13 +424,40 @@ def api_post(
 
 
 def fetch_video_list(session: requests.Session, state: SessionState) -> list[dict[str, Any]]:
-    payload = api_post(
-        session,
-        "/directOnDemandPlay/findVodVideoList",
-        token=state.token,
-        json_body={"canvasCourseId": state.cour_id},
-    )
-    return payload["data"]["records"]
+    if not state.cour_id:
+        raise RuntimeError("缺少视频平台课程 ID")
+    candidates: list[dict[str, Any]] = []
+    course_ids = [str(state.cour_id)]
+    encoded = quote(str(state.cour_id), safe="")
+    if encoded not in course_ids:
+        course_ids.append(encoded)
+    for course_id in course_ids:
+        candidates.extend(
+            [
+                {"canvasCourseId": course_id},
+                {"canvasCourseId": course_id, "pageIndex": 1, "pageSize": 1000},
+                {"courId": course_id},
+                {"courseId": course_id},
+                {"ltiCourseId": course_id},
+            ]
+        )
+
+    last_error: Exception | None = None
+    for body in candidates:
+        try:
+            payload = api_post(
+                session,
+                "/directOnDemandPlay/findVodVideoList",
+                token=state.token,
+                json_body=body,
+            )
+            records = extract_video_records(payload)
+        except Exception as exc:
+            last_error = exc
+            continue
+        if records:
+            return records
+    raise RuntimeError(f"视频列表为空或无法识别，最后错误: {last_error}")
 
 
 def fetch_streams(session: requests.Session, state: SessionState, video_id: str) -> list[dict[str, Any]]:
@@ -157,7 +467,11 @@ def fetch_streams(session: requests.Session, state: SessionState, video_id: str)
         token=state.token,
         form_body={"id": video_id, "playTypeHls": "true", "isAudit": "true"},
     )
-    return payload["data"]["videoPlayResponseVoList"]
+    detail = extract_video_detail(payload)
+    streams = detail.get("videoPlayResponseVoList")
+    if not isinstance(streams, list):
+        raise RuntimeError(f"视频详情中没有 videoPlayResponseVoList: {payload}")
+    return [item for item in streams if isinstance(item, dict)]
 
 
 def probe_stream(session: requests.Session, url: str) -> int:
@@ -190,32 +504,65 @@ def choose_stream(session: requests.Session, streams: list[dict[str, Any]], view
     return min(candidates, key=lambda item: (item.content_length or 10**18, item.channel_num))
 
 
-def lecture_index(record: dict[str, Any]) -> int:
-    match = re.search(r"第(\d+)讲", record["videoName"])
+def lecture_index(record: dict[str, Any], fallback: int | None = None) -> int:
+    name = str(record.get("videoName") or record.get("name") or "")
+    match = re.search(r"第\s*(\d+)\s*(?:讲|课时|节|次)", name)
     if not match:
-        raise RuntimeError(f"无法从标题解析课时序号: {record['videoName']}")
+        for key in ("lecture", "lectureIndex", "index", "lesson"):
+            value = record.get(key)
+            if isinstance(value, int):
+                return value
+            if isinstance(value, str) and value.isdigit():
+                return int(value)
+        if fallback is not None:
+            return fallback
+        raise RuntimeError(f"无法从标题解析课时序号: {name}")
     return int(match.group(1))
 
 
 def course_slug(record: dict[str, Any]) -> str:
-    raw = record["videoName"]
-    label = re.sub(r"\(第\d+讲\)", "", raw).strip()
+    raw = str(record.get("videoName") or record.get("name") or "课程")
+    label = re.sub(r"[（(]第\s*\d+\s*(?:讲|课时|节|次)[）)]", "", raw).strip()
     label = re.sub(r"[^\w\u4e00-\u9fff]+", "", label)
     return label or "课程"
 
 
+def parse_begin_time(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return None
+
+
 def output_name(record: dict[str, Any]) -> str:
-    index = lecture_index(record)
-    start = datetime.strptime(record["courseBeginTime"], "%Y-%m-%d %H:%M:%S")
+    index = lecture_index(record, fallback=record.get("_lecture_index"))
+    begin_time = str(record.get("courseBeginTime") or record.get("dt_start") or "")
+    start = parse_begin_time(begin_time)
+    if start is None:
+        return f"{course_slug(record)}_第{index:02d}课时.mp4"
     return f"{course_slug(record)}_第{index:02d}课时_{start:%Y-%m-%d_%H%M}.mp4"
 
 
+def with_lecture_indices(records: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    indexed: list[dict[str, Any]] = []
+    for fallback, record in enumerate(records, start=1):
+        copied = dict(record)
+        copied["_lecture_index"] = lecture_index(copied, fallback=fallback)
+        indexed.append(copied)
+    return indexed
+
+
 def parse_targets(records: Iterable[dict[str, Any]], numbers: list[int] | None) -> list[dict[str, Any]]:
+    indexed_records = with_lecture_indices(records)
     if not numbers:
-        return list(records)
+        return indexed_records
     wanted = set(numbers)
-    selected = [record for record in records if lecture_index(record) in wanted]
-    missing = sorted(wanted - {lecture_index(record) for record in selected})
+    selected = [record for record in indexed_records if int(record["_lecture_index"]) in wanted]
+    missing = sorted(wanted - {int(record["_lecture_index"]) for record in selected})
     if missing:
         raise RuntimeError(f"未找到这些课时: {missing}")
     return selected
@@ -344,11 +691,12 @@ def download(url: str, out: Path, expected_size: int, *, resume: bool) -> None:
 
 
 def manifest_entry(record: dict[str, Any], choice: StreamChoice, out: Path) -> dict[str, Any]:
+    index = lecture_index(record, fallback=record.get("_lecture_index"))
     return {
-        "lecture": lecture_index(record),
-        "label": f"第{lecture_index(record):02d}课时",
-        "videoName": record["videoName"],
-        "beginTime": record["courseBeginTime"],
+        "lecture": index,
+        "label": f"第{index:02d}课时",
+        "videoName": record.get("videoName") or record.get("name"),
+        "beginTime": record.get("courseBeginTime") or record.get("dt_start"),
         "videoId": record["videoId"],
         "channel": choice.channel_num,
         "view": choice.view_num,
@@ -408,6 +756,16 @@ def verify_manifest_entries(
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("lectures", nargs="*", type=int, help="要下载的课时编号，例如 4 5 6")
+    parser.add_argument(
+        "--source",
+        choices=["session-storage", "sjtu-lti"],
+        default="session-storage",
+        help="视频 token 来源；默认沿用 Chrome Session Storage，sjtu-lti 复用 oc.sjtu.edu.cn 已登录 cookie",
+    )
+    parser.add_argument("--course-id", help="SJTU Canvas 课程页 ID，用于 --source sjtu-lti")
+    parser.add_argument("--external-tool-id", help="SJTU 课堂视频 external tool id；不传时从课程页自动发现，失败则使用 8329")
+    parser.add_argument("--canvas-cookie-file", type=Path, help="包含 oc.sjtu.edu.cn 登录 cookie 的文件，支持 Netscape 或 name=value 格式")
+    parser.add_argument("--canvas-cookie", help="直接传入 oc.sjtu.edu.cn 登录 Cookie header，例如 'JAAuthCookie=...'")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--session-storage", type=Path, default=SESSION_STORAGE)
     parser.add_argument("--manifest", type=Path)
@@ -457,14 +815,28 @@ def main() -> int:
     if args.retry_failed:
         should_download = True
 
-    state = load_session_state(args.session_storage.expanduser())
     downloaded_count = 0
     manifest: list[dict[str, Any]] = []
     with requests.Session() as session:
+        if args.source == "sjtu-lti":
+            if not args.course_id:
+                raise RuntimeError("--source sjtu-lti 需要 --course-id")
+            update_session_cookies(
+                session,
+                cookie_file=args.canvas_cookie_file,
+                cookie_header=args.canvas_cookie,
+            )
+            state = load_sjtu_lti_state(
+                session,
+                course_id=args.course_id,
+                external_tool_id=args.external_tool_id,
+            )
+        else:
+            state = load_session_state(args.session_storage.expanduser())
+
         records = fetch_video_list(session, state)
         targets = parse_targets(records, args.lectures)
         for record in targets:
-            idx = lecture_index(record)
             streams = fetch_streams(session, state, record["videoId"])
             choice = choose_stream(session, streams, view_num=args.view_num)
             out = args.output_dir / output_name(record)
@@ -532,4 +904,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except RuntimeError as exc:
+        print(f"[error] {exc}", file=sys.stderr)
+        raise SystemExit(1)

@@ -23,9 +23,11 @@ Use this skill for course-recording workflows where the output is not just a tra
 3. If videos must be fetched from Canvas and the repo script is present, use:
    - `download_canvas_videos.py`
    - prefer its status, resume, verify, and bounded-batch modes when available
+   - for SJTU Canvas, use `--source sjtu-lti --course-id <id>` with a fresh authenticated `oc.sjtu.edu.cn` cookie when Chrome Session Storage does not expose a usable video token
 4. If transcription is needed, use:
    - `process_lecture.py`
    - `run_course_pipeline.py` for batch runs
+   - keep local Whisper transcription as the formal transcript path; platform captions may exist but should not replace Whisper by default
 5. Build slide context with:
    - `build_slide_index.py`
    - `scan_ppt_hits.py`
@@ -64,6 +66,7 @@ For LMS/Canvas downloads, prefer a resumable queue over one-off scripts.
 - Verify downloads by file existence, reasonable size, and duration when a media probe is available.
 - Preserve failed or partial evidence in logs; clean misleading tiny files or stale `.part` files only after recording the failure.
 - If authentication depends on browser cookies or session storage, record that dependency and fail clearly when the login state expires.
+- For SJTU LTI downloads, do not store account passwords in the repo. Reuse an already authenticated cookie via `--canvas-cookie-file` or `--canvas-cookie`.
 
 ## Transcription QC
 

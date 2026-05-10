@@ -130,6 +130,33 @@ Or by passing:
 python3 download_canvas_videos.py 4 5 6 --session-storage "/path/to/Session Storage"
 ```
 
+For SJTU Canvas, the downloader can also reuse an already authenticated `oc.sjtu.edu.cn` cookie and follow the LTI3 handoff to `v.sjtu.edu.cn`:
+
+```bash
+python3 download_canvas_videos.py \
+  --source sjtu-lti \
+  --course-id 123456 \
+  --canvas-cookie-file /path/to/cookies.txt \
+  --sync-details \
+  --output-dir /path/to/course-root/downloads
+```
+
+Then download a bounded batch:
+
+```bash
+python3 download_canvas_videos.py \
+  --source sjtu-lti \
+  --course-id 123456 \
+  --canvas-cookie-file /path/to/cookies.txt \
+  1 2 \
+  --download \
+  --resume \
+  --max-count 2 \
+  --output-dir /path/to/course-root/downloads
+```
+
+`--canvas-cookie-file` accepts Netscape cookie exports and simple `name=value; name2=value2` cookie header text. You can also pass the header directly with `--canvas-cookie`. This mode does not store account passwords or perform jAccount login; refresh the cookie from your own browser session when it expires.
+
 This script is intentionally local-first. It is designed for workflows where the user is already logged into Canvas in Chrome on the same machine.
 
 For resumable course runs, use the downloader as a small stateful job rather than a long detached process:
@@ -175,6 +202,8 @@ For unattended project work, do not make the pipeline depend on an open browser 
 - A symlinked `downloads/` directory is acceptable if the real files live elsewhere.
 - If the next lecture video is missing locally, record that as a project gap instead of assuming Canvas is still open in the current thread.
 - Treat browser session state as opportunistic input, not as the primary long-term source of truth.
+- For SJTU Canvas, prefer `--source sjtu-lti` with a fresh authenticated cookie when Chrome Session Storage does not contain the video-platform token.
+- Platform captions are not part of the default workflow. Use local Whisper transcription through `process_lecture.py` for formal note inputs.
 
 ## Transcription process hygiene
 
