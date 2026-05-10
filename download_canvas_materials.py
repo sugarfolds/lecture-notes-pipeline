@@ -530,9 +530,9 @@ def print_status(status_path: Path, status: dict[str, Any]) -> None:
         print(f"  {state}: {count}")
 
 
-def parse_include(values: list[str]) -> set[str]:
+def parse_include(values: list[str] | None) -> set[str]:
     include: set[str] = set()
-    for value in values:
+    for value in values or []:
         for item in value.split(","):
             item = item.strip()
             if item:

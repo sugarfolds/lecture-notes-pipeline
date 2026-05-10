@@ -897,9 +897,9 @@ def main() -> int:
             "should_download": should_download,
         },
     )
-    print(json.dumps(manifest, ensure_ascii=False, indent=2))
     print(f"[manifest] {manifest_path}")
     print(f"[status] {status_path}")
+    print(f"[entries] {len(manifest)}")
     return 0
 
 

@@ -1,16 +1,23 @@
 # lecture-notes-pipeline
 
-> Recorded classes turned into PPT-aligned, review-ready study notes.
+> Download Canvas course materials, recordings, and local Whisper transcripts.
+> Optional Codex / Claude Code skill for PPT-aligned study notes.
 
-Pipeline for turning recorded course sessions into PPT-aligned study notes.
+This repository is useful in two modes:
 
-The repository is built around a pragmatic workflow:
+1. Without an agent: download Canvas course files, download lecture recordings, and transcribe videos locally with Whisper.
+2. With an agent: align slides and transcripts, judge lecture boundaries, clean low-confidence fragments, and write compact study notes.
 
-1. Download or collect lecture videos.
-2. Extract audio and run Whisper transcription.
-3. Align transcript content to PPT boundaries instead of hard-cutting by session.
-4. Resolve noisy transcript fragments against slides or reference notes when there is evidence.
-5. Produce compact, review-oriented notes.
+The command-line pipeline covers the mechanical work:
+
+```text
+materials/   Canvas course files, PPTs, module files, assignment attachments
+downloads/   Canvas lecture recordings
+audio/       extracted audio
+transcripts/ local Whisper transcripts
+```
+
+The bundled skill covers the judgment-heavy work after those assets exist.
 
 ## Preview
 
@@ -20,7 +27,8 @@ Exported lecture note sample:
 
 ## What this repo does
 
-- Downloads Canvas-hosted recordings when a local logged-in browser session is available.
+- Downloads Canvas course materials when a local logged-in browser session is available.
+- Downloads Canvas-hosted recordings from SJTU's video platform.
 - Extracts audio with `ffmpeg`.
 - Transcribes Chinese lectures with `mlx-whisper`.
 - Builds a quick slide text index from PDF decks.
@@ -32,7 +40,7 @@ Exported lecture note sample:
 - `download_canvas_videos.py`: download Canvas recordings with the smallest available stream.
 - `download_canvas_materials.py`: download Canvas course files, module files, assignment pages, and assignment attachments.
 - `process_lecture.py`: extract audio and transcribe one or more lecture videos.
-- `run_course_pipeline.py`: batch wrapper around download and transcription.
+- `run_course_pipeline.py`: unified wrapper for materials, video downloads, and transcription.
 - `build_slide_index.py`: extract a quick text preview from PPT PDFs.
 - `scan_ppt_hits.py`: rough transcript-to-PPT keyword scan.
 - `fuzzy_lookup.py`: fuzzy lookup over slide PDFs and reference notes.
@@ -67,29 +75,59 @@ pip install -r requirements.txt
 
 ## Quick start
 
-Build a slide index:
+Refresh your browser login at `oc.sjtu.edu.cn`, then create a local course root:
 
 ```bash
-python3 build_slide_index.py --ppt-dir /path/to/ppt --output slides_index.md
+mkdir -p /path/to/course-root
 ```
 
-Transcribe local videos:
+Sync Canvas materials and recording metadata without downloading:
 
 ```bash
-python3 process_lecture.py /path/to/video1.mp4 /path/to/video2.mp4
+python3 run_course_pipeline.py \
+  --course-id 123456 \
+  --from-chrome \
+  --steps materials,videos \
+  --course-root /path/to/course-root
 ```
 
-Batch download and transcribe:
+Download a small bounded batch:
 
 ```bash
-python3 run_course_pipeline.py --start 1 --end 6 --step all
+python3 run_course_pipeline.py \
+  --course-id 123456 \
+  --from-chrome \
+  --steps materials,videos \
+  --start 1 \
+  --end 3 \
+  --download \
+  --max-count 3 \
+  --course-root /path/to/course-root
 ```
 
-Recommended for large courses:
+Transcribe downloaded videos:
 
 ```bash
-python3 download_canvas_videos.py 1 2 --download --resume --output-dir /path/to/course-root/downloads
+python3 run_course_pipeline.py \
+  --course-id 123456 \
+  --steps transcribe \
+  --start 1 \
+  --end 3 \
+  --course-root /path/to/course-root
+```
+
+You can also run each layer directly:
+
+```bash
+python3 download_canvas_materials.py --course-id 123456 --from-chrome --download --output-dir /path/to/course-root/materials
+python3 download_canvas_videos.py --source sjtu-lti --course-id 123456 --canvas-cookie-file /path/to/cookies.txt 1 2 --download --output-dir /path/to/course-root/downloads
 python3 process_lecture.py /path/to/course-root/downloads/*.mp4 --audio-dir /path/to/course-root/audio --transcript-dir /path/to/course-root/transcripts
+```
+
+Build a slide index after materials are in place:
+
+```bash
+python3 build_slide_index.py --ppt-dir /path/to/course-root/materials --output /path/to/course-root/slides_index.md
 ```
 
 Fuzzy lookup for noisy fragments:
