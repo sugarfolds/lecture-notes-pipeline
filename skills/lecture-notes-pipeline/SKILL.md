@@ -24,23 +24,27 @@ Use this skill for course-recording workflows where the output is not just a tra
    - `download_canvas_videos.py`
    - prefer its status, resume, verify, and bounded-batch modes when available
    - for SJTU Canvas, use `--source sjtu-lti --course-id <id>` with a fresh authenticated `oc.sjtu.edu.cn` cookie when Chrome Session Storage does not expose a usable video token
-4. If transcription is needed, use:
+4. If course files, PPTs, module files, or assignment attachments must be fetched from Canvas and the repo script is present, use:
+   - `download_canvas_materials.py`
+   - keep downloaded materials under `materials/` or the local course equivalent, separate from recording downloads
+   - prefer `--sync-details` first, then bounded `--download --max-count <n>` runs
+5. If transcription is needed, use:
    - `process_lecture.py`
    - `run_course_pipeline.py` for batch runs
    - keep local Whisper transcription as the formal transcript path; platform captions may exist but should not replace Whisper by default
-5. Build slide context with:
+6. Build slide context with:
    - `build_slide_index.py`
    - `scan_ppt_hits.py`
-6. If the user wants a reading version rather than only editable notes, export:
+7. If the user wants a reading version rather than only editable notes, export:
    - `export_notes_pdf.py`
-7. Determine boundaries by content and slide deck, not by session number.
-8. For noisy transcript fragments:
+8. Determine boundaries by content and slide deck, not by session number.
+9. For noisy transcript fragments:
    - first check slide PDFs
    - then check any reference notes
    - only correct text when there is supporting evidence
    - otherwise omit the fragment from formal notes and record the uncertainty
-9. Maintain queue and uncertainty records when the workspace already uses them.
-10. Keep process lifecycle operationally tight:
+10. Maintain queue and uncertainty records when the workspace already uses them.
+11. Keep process lifecycle operationally tight:
    - prefer small download batches over one long detached semester-wide job
    - long download or transcription work must leave a status file, log, and verification result
    - automation should advance one bounded, verifiable step; it should not be treated as the downloader itself
@@ -49,9 +53,9 @@ Use this skill for course-recording workflows where the output is not just a tra
    - if transcription `python` processes are finished, stalled, or no longer needed, clean them up promptly as well
    - after every completed download or transcription batch, explicitly check for residual processes instead of assuming they exited cleanly
    - do not leave heavy background download or transcription jobs running unattended on the user's machine
-11. If the local project does not contain the next required video, record that as a concrete project status gap instead of pretending the web source is still available.
-12. If slides are missing for a transcript range, create a gap list and preparatory checklist; do not force a formal lecture note before the slide boundary is stable.
-13. If slides exist and have been checked but no stable transcript or recording segment matches them, create a slide-only materials note instead of leaving the material unusable:
+12. If the local project does not contain the next required video, record that as a concrete project status gap instead of pretending the web source is still available.
+13. If slides are missing for a transcript range, create a gap list and preparatory checklist; do not force a formal lecture note before the slide boundary is stable.
+14. If slides exist and have been checked but no stable transcript or recording segment matches them, create a slide-only materials note instead of leaving the material unusable:
    - follow the local course naming convention, such as `第XX讲_主题_课件材料笔记.md` in Chinese course repos, or the closest local equivalent
    - mark at the top that it is based on slides only and has no stable transcript-backed lecture expansion yet
    - do not label it as a formal integrated lecture note
@@ -67,6 +71,7 @@ For LMS/Canvas downloads, prefer a resumable queue over one-off scripts.
 - Preserve failed or partial evidence in logs; clean misleading tiny files or stale `.part` files only after recording the failure.
 - If authentication depends on browser cookies or session storage, record that dependency and fail clearly when the login state expires.
 - For SJTU LTI downloads, do not store account passwords in the repo. Reuse an already authenticated cookie via `--canvas-cookie-file` or `--canvas-cookie`.
+- For Canvas material downloads, use `--from-chrome` only when local Chrome has a current Canvas login. If Canvas API returns unauthorized, ask the user to refresh login rather than retrying blindly.
 
 ## Transcription QC
 
@@ -115,6 +120,7 @@ Treat low-confidence fragments conservatively.
 If this repo is present, prefer these scripts over ad hoc rewrites:
 
 - `download_canvas_videos.py`
+- `download_canvas_materials.py`
 - `process_lecture.py`
 - `run_course_pipeline.py`
 - `cleanup_download_jobs.py`

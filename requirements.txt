@@ -3,3 +3,4 @@ mlx-whisper
 reportlab
 pypdf
 python-pptx
+browser-cookie3

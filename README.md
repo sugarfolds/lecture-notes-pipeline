@@ -30,6 +30,7 @@ Exported lecture note sample:
 ## Repository layout
 
 - `download_canvas_videos.py`: download Canvas recordings with the smallest available stream.
+- `download_canvas_materials.py`: download Canvas course files, module files, assignment pages, and assignment attachments.
 - `process_lecture.py`: extract audio and transcribe one or more lecture videos.
 - `run_course_pipeline.py`: batch wrapper around download and transcription.
 - `build_slide_index.py`: extract a quick text preview from PPT PDFs.
@@ -49,6 +50,7 @@ Python packages:
 - `reportlab`
 - `pypdf`
 - `python-pptx`
+- `browser-cookie3`
 
 System tools:
 
@@ -176,6 +178,45 @@ The downloader writes:
 
 If Canvas exposes multiple recording views and you know the desired `cdviViewNum`, pass `--view-num`. Otherwise the downloader keeps the previous behavior and chooses the smallest downloadable stream.
 
+## Canvas material download
+
+`download_canvas_materials.py` downloads course materials from Canvas itself, separate from lecture recordings. It can discover:
+
+- course files
+- files linked from modules
+- assignment pages
+- files linked from assignment descriptions
+
+For SJTU Canvas, first refresh your browser login at `oc.sjtu.edu.cn`, then run:
+
+```bash
+python3 download_canvas_materials.py \
+  --course-id 123456 \
+  --from-chrome \
+  --sync-details \
+  --output-dir /path/to/course-root/materials
+```
+
+Or pass a cookie file explicitly:
+
+```bash
+python3 download_canvas_materials.py \
+  --course-id 123456 \
+  --canvas-cookie-file /path/to/cookies.txt \
+  --download \
+  --resume \
+  --max-count 10 \
+  --output-dir /path/to/course-root/materials
+```
+
+The material downloader writes:
+
+- `canvas_materials_manifest.json`: discovered material entries and target paths
+- `canvas_materials_status.json`: per-entry `pending / downloading / verified / failed / skipped` state
+- `material_runs/*.jsonl`: run logs
+
+Use `--include files`, `--include modules`, or `--include assignments` to limit discovery. Keep large material pulls bounded with `--max-count`, especially when assignment attachments are numerous.
+
 ## Download process hygiene
 
 Do not leave large download jobs hanging in the background.
@@ -203,6 +244,7 @@ For unattended project work, do not make the pipeline depend on an open browser 
 - If the next lecture video is missing locally, record that as a project gap instead of assuming Canvas is still open in the current thread.
 - Treat browser session state as opportunistic input, not as the primary long-term source of truth.
 - For SJTU Canvas, prefer `--source sjtu-lti` with a fresh authenticated cookie when Chrome Session Storage does not contain the video-platform token.
+- For Canvas course materials, use `download_canvas_materials.py`; keep materials under `materials/` and recordings under `downloads/`.
 - Platform captions are not part of the default workflow. Use local Whisper transcription through `process_lecture.py` for formal note inputs.
 
 ## Transcription process hygiene
