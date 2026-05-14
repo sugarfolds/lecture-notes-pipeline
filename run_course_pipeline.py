@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 MATERIALS_SCRIPT = ROOT / "download_canvas_materials.py"
 DOWNLOAD_SCRIPT = ROOT / "download_canvas_videos.py"
+EXTRACT_AUDIO_SCRIPT = ROOT / "extract_audio.py"
 PROCESS_SCRIPT = ROOT / "process_lecture.py"
 
 
@@ -28,9 +29,9 @@ def lecture_number(path: Path) -> int:
 
 def parse_steps(raw: str) -> list[str]:
     if raw == "all":
-        return ["materials", "videos", "transcribe"]
+        return ["materials", "videos", "audio", "transcribe"]
     steps = [item.strip() for item in raw.split(",") if item.strip()]
-    allowed = {"materials", "videos", "transcribe"}
+    allowed = {"materials", "videos", "audio", "transcribe"}
     unknown = sorted(set(steps) - allowed)
     if unknown:
         raise RuntimeError(f"未知 steps: {unknown}")
@@ -53,6 +54,21 @@ def existing_videos(download_dir: Path, start: int | None, end: int | None) -> l
         return videos
     selected: list[Path] = []
     for path in videos:
+        try:
+            idx = lecture_number(path)
+        except RuntimeError:
+            continue
+        if start is not None and end is not None and start <= idx <= end:
+            selected.append(path)
+    return selected
+
+
+def existing_audio(audio_dir: Path, start: int | None, end: int | None) -> list[Path]:
+    audio_files = sorted(audio_dir.glob("*.m4a"))
+    if start is None and end is None:
+        return audio_files
+    selected: list[Path] = []
+    for path in audio_files:
         try:
             idx = lecture_number(path)
         except RuntimeError:
@@ -131,9 +147,9 @@ def videos_command(args: argparse.Namespace, cookie_file: Path | None) -> list[s
 
 
 def transcribe_command(args: argparse.Namespace) -> list[str]:
-    targets = existing_videos(args.course_root / "downloads", args.start, args.end)
+    targets = existing_audio(args.course_root / "audio", args.start, args.end)
     if not targets:
-        raise RuntimeError(f"未找到可转写视频: {args.course_root / 'downloads'}")
+        raise RuntimeError(f"未找到可转写音频: {args.course_root / 'audio'}")
     return [
         "python3",
         str(PROCESS_SCRIPT),
@@ -142,6 +158,19 @@ def transcribe_command(args: argparse.Namespace) -> list[str]:
         str(args.course_root / "audio"),
         "--transcript-dir",
         str(args.course_root / "transcripts"),
+    ]
+
+
+def audio_command(args: argparse.Namespace) -> list[str]:
+    targets = existing_videos(args.course_root / "downloads", args.start, args.end)
+    if not targets:
+        raise RuntimeError(f"未找到可抽音频视频: {args.course_root / 'downloads'}")
+    return [
+        "python3",
+        str(EXTRACT_AUDIO_SCRIPT),
+        *[str(path) for path in targets],
+        "--audio-dir",
+        str(args.course_root / "audio"),
     ]
 
 
@@ -160,6 +189,8 @@ def run_modern(args: argparse.Namespace) -> None:
                 run(materials_command(args))
             elif step == "videos":
                 run(videos_command(args, Path(temp_cookie.name) if temp_cookie else None))
+            elif step == "audio":
+                run(audio_command(args))
             elif step == "transcribe":
                 run(transcribe_command(args))
     finally:
@@ -186,10 +217,21 @@ def run_legacy(args: argparse.Namespace) -> None:
                 "--resume",
             ]
         )
-    if args.step in {"transcribe", "all"}:
+    if args.step in {"audio", "all"}:
         targets = existing_videos(course_root / "downloads", args.start, args.end)
         if not targets:
             raise RuntimeError(f"未找到第 {args.start}-{args.end} 课时视频")
+        run(
+            [
+                "python3",
+                str(EXTRACT_AUDIO_SCRIPT),
+                *[str(path) for path in targets],
+            ]
+        )
+    if args.step in {"transcribe", "all"}:
+        targets = existing_audio(course_root / "audio", args.start, args.end)
+        if not targets:
+            raise RuntimeError(f"未找到第 {args.start}-{args.end} 课时音频")
         run(["python3", str(PROCESS_SCRIPT), *[str(path) for path in targets]])
 
 
@@ -197,7 +239,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--course-id", help="Canvas course id for modern materials/videos pipeline")
     parser.add_argument("--course-root", type=Path, default=Path("."))
-    parser.add_argument("--steps", help="Comma-separated modern steps: materials,videos,transcribe, or all")
+    parser.add_argument("--steps", help="Comma-separated modern steps: materials,videos,audio,transcribe, or all")
     parser.add_argument("--download", action="store_true", help="Download materials/videos; default is sync-details only")
     parser.add_argument("--max-count", type=int, default=3, help="Max material/video entries to download per run")
     parser.add_argument("--from-chrome", action="store_true", help="Load Canvas cookies from local Chrome")
@@ -208,7 +250,7 @@ def main() -> None:
     parser.add_argument("--end", type=int)
     parser.add_argument(
         "--step",
-        choices=["download", "transcribe", "all"],
+        choices=["download", "audio", "transcribe", "all"],
         default="all",
         help="Legacy video-only step; use --steps for the modern pipeline",
     )

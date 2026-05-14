@@ -5,10 +5,10 @@
 
 This repository is useful in two modes:
 
-1. Without an agent: download Canvas course files, download lecture recordings, and transcribe videos locally with Whisper.
+1. Without an agent: download Canvas course files, download lecture recordings, extract audio, and transcribe locally with Whisper.
 2. With an agent: align slides and transcripts, judge lecture boundaries, clean low-confidence fragments, and write compact study notes.
 
-The command-line pipeline covers the mechanical work:
+The command-line pipeline covers the mechanical work in four layers:
 
 ```text
 materials/   Canvas course files, PPTs, module files, assignment attachments
@@ -29,8 +29,8 @@ Exported lecture note sample:
 
 - Downloads Canvas course materials when a local logged-in browser session is available.
 - Downloads Canvas-hosted recordings from SJTU's video platform.
-- Extracts audio with `ffmpeg`.
-- Transcribes Chinese lectures with `mlx-whisper`.
+- Extracts audio with `ffmpeg` as an explicit separate step.
+- Transcribes Chinese lecture audio with `mlx-whisper`.
 - Builds a quick slide text index from PDF decks.
 - Runs rough PPT keyword scans over transcripts.
 - Supports fuzzy lookup against slides and reference notes for low-confidence fragments.
@@ -39,8 +39,9 @@ Exported lecture note sample:
 
 - `download_canvas_videos.py`: download Canvas recordings with the smallest available stream.
 - `download_canvas_materials.py`: download Canvas course files, module files, assignment pages, and assignment attachments.
-- `process_lecture.py`: extract audio and transcribe one or more lecture videos.
-- `run_course_pipeline.py`: unified wrapper for materials, video downloads, and transcription.
+- `extract_audio.py`: extract audio from one or more lecture videos.
+- `process_lecture.py`: transcribe one or more existing audio files.
+- `run_course_pipeline.py`: unified wrapper for materials, video downloads, audio extraction, and transcription.
 - `build_slide_index.py`: extract a quick text preview from PPT PDFs.
 - `scan_ppt_hits.py`: rough transcript-to-PPT keyword scan.
 - `fuzzy_lookup.py`: fuzzy lookup over slide PDFs and reference notes.
@@ -105,7 +106,18 @@ python3 run_course_pipeline.py \
   --course-root /path/to/course-root
 ```
 
-Transcribe downloaded videos:
+Extract audio from downloaded videos:
+
+```bash
+python3 run_course_pipeline.py \
+  --course-id 123456 \
+  --steps audio \
+  --start 1 \
+  --end 3 \
+  --course-root /path/to/course-root
+```
+
+Transcribe extracted audio:
 
 ```bash
 python3 run_course_pipeline.py \
@@ -121,7 +133,8 @@ You can also run each layer directly:
 ```bash
 python3 download_canvas_materials.py --course-id 123456 --from-chrome --download --output-dir /path/to/course-root/materials
 python3 download_canvas_videos.py --source sjtu-lti --course-id 123456 --canvas-cookie-file /path/to/cookies.txt 1 2 --download --output-dir /path/to/course-root/downloads
-python3 process_lecture.py /path/to/course-root/downloads/*.mp4 --audio-dir /path/to/course-root/audio --transcript-dir /path/to/course-root/transcripts
+python3 extract_audio.py /path/to/course-root/downloads/*.mp4 --audio-dir /path/to/course-root/audio
+python3 process_lecture.py /path/to/course-root/audio/*.m4a --transcript-dir /path/to/course-root/transcripts
 ```
 
 Build a slide index after materials are in place:

@@ -28,9 +28,10 @@ Use this skill for course-recording workflows where the output is not just a tra
    - `download_canvas_materials.py`
    - keep downloaded materials under `materials/` or the local course equivalent, separate from recording downloads
    - prefer `--sync-details` first, then bounded `--download --max-count <n>` runs
-5. If transcription is needed, use:
-   - `process_lecture.py`
-   - `run_course_pipeline.py` for batch runs
+5. If transcription is needed, keep it split into two steps:
+   - first use `extract_audio.py` to turn `downloads/*.mp4` into `audio/*.m4a`
+   - then use `process_lecture.py` only on existing `audio/*.m4a`
+   - `run_course_pipeline.py` can orchestrate batch runs with separate `audio` and `transcribe` steps
    - keep local Whisper transcription as the formal transcript path; platform captions may exist but should not replace Whisper by default
 6. Build slide context with:
    - `build_slide_index.py`
@@ -121,6 +122,7 @@ If this repo is present, prefer these scripts over ad hoc rewrites:
 
 - `download_canvas_videos.py`
 - `download_canvas_materials.py`
+- `extract_audio.py`
 - `process_lecture.py`
 - `run_course_pipeline.py`
 - `cleanup_download_jobs.py`
